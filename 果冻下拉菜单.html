@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>果冻下拉菜单 · 科技名人</title>
+  <style>
+    :root {
+      --ink: #141414;
+      --ink-2: rgba(20,20,20,.6);
+      --ink-3: rgba(20,20,20,.36);
+      --hover: rgba(119,119,119,.09);
+      --active: rgba(119,119,119,.17);
+      --card: #ffffff;
+      --line: rgba(20,20,20,.08);
+      --accent: #4d6bfe;
+      --sidebar: #f7f7f7;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: #f0f0f0;
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--ink-2);
+      letter-spacing: -0.02em;
+    }
+
+    .trigger-wrap {
+      position: relative;
+      width: 340px;
+    }
+
+    .trigger {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 14px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      cursor: pointer;
+      user-select: none;
+      transition: background .12s ease, border-color .12s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    }
+    .trigger:hover { background: #fafafa; }
+    .trigger[data-open] {
+      border-color: rgba(77,107,254,.35);
+      box-shadow: 0 0 0 3px rgba(77,107,254,.12);
+    }
+
+    .trigger-label {
+      font-size: 13px;
+      color: var(--ink-3);
+      flex: none;
+    }
+    .trigger-value {
+      font-size: 14px;
+      color: var(--ink-2);
+      flex: 1;
+    }
+    .trigger-value.has-value { color: var(--ink); font-weight: 500; }
+
+    .chevron {
+      width: 16px;
+      height: 16px;
+      color: var(--ink-3);
+      transition: transform .2s ease;
+    }
+    .trigger[data-open] .chevron { transform: rotate(180deg); }
+
+    .menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,.04),
+        0 8px 24px rgba(0,0,0,.08),
+        0 2px 6px rgba(0,0,0,.04);
+      padding: 6px;
+      z-index: 20;
+      transform-origin: top center;
+      opacity: 0;
+      pointer-events: none;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .menu[data-open] {
+      pointer-events: auto;
+      animation: menu-in var(--spring-duration) var(--spring-easing) forwards;
+    }
+    .menu[data-leaving] {
+      pointer-events: none;
+      animation: menu-out .14s cubic-bezier(.4,0,1,1) forwards;
+    }
+
+    @keyframes menu-in {
+      from {
+        opacity: 0;
+        transform: scale(.92) translateY(-6px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+    @keyframes menu-out {
+      from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+      to {
+        opacity: 0;
+        transform: scale(.94) translateY(-4px);
+      }
+    }
+
+    .menu-list {
+      position: relative;
+      list-style: none;
+    }
+
+    .menu-item {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.3;
+      cursor: pointer;
+      color: var(--ink);
+      background: transparent;
+      border: 0;
+      width: 100%;
+      text-align: left;
+      font: inherit;
+      transition: color .12s ease;
+    }
+
+    .avatar {
+      flex: none;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: white;
+      letter-spacing: -0.02em;
+    }
+
+    .item-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+    }
+    .item-name {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .item-desc {
+      font-size: 12px;
+      color: var(--ink-3);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .thumb {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 48px;
+      border-radius: 8px;
+      background: var(--active);
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0;
+      will-change: transform, height;
+    }
+    .thumb[data-visible] { opacity: 1; }
+
+    .note {
+      max-width: 440px;
+      background: var(--card);
+      border-radius: 12px;
+      padding: 18px 20px;
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--ink-2);
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .note strong { color: var(--ink); font-weight: 600; }
+    .note code {
+      background: var(--sidebar);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    .menu-item:active { transform: scale(.97); }
+  </style>
+</head>
+<body>
+
+  <h1>果冻下拉菜单 · 科技名人</h1>
+
+  <div class="trigger-wrap">
+    <div class="trigger" id="trigger">
+      <span class="trigger-label">选择：</span>
+      <span class="trigger-value" id="triggerValue">科技名人…</span>
+      <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M6 9l6 6 6-6"/>
+      </svg>
+    </div>
+
+    <div class="menu" id="menu">
+      <ul class="menu-list" id="menuList">
+        <div class="thumb" id="thumb"></div>
+        <!-- items injected by JS -->
+      </ul>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>实现要点</strong><br>
+    1. 阻尼弹簧采样为 <code>linear()</code> 缓动，菜单弹出带轻微过冲<br>
+    2. 高亮条前缘硬弹簧 + 后缘软弹簧，形成果冻拉伸拖尾<br>
+    3. <code>requestAnimationFrame</code> 积分，中途改目标保留速度<br>
+    4. 支持键盘 ↑↓ 选择、Enter 确认、Esc 关闭
+  </div>
+
+  <script>
+    // ---------- 科技名人数据 ----------
+    const people = [
+      { name: 'Elon Musk',      desc: 'Tesla · SpaceX · xAI',     color: '#e82127', initial: 'EM' },
+      { name: 'Jensen Huang',   desc: 'NVIDIA 创始人',            color: '#76b900', initial: 'JH' },
+      { name: 'Sam Altman',     desc: 'OpenAI CEO',               color: '#10a37f', initial: 'SA' },
+      { name: 'Demis Hassabis', desc: 'Google DeepMind',          color: '#4285f4', initial: 'DH' },
+      { name: 'Mark Zuckerberg',desc: 'Meta · Facebook',          color: '#0866ff', initial: 'MZ' },
+      { name: 'Tim Cook',       desc: 'Apple CEO',                color: '#555555', initial: 'TC' },
+      { name: 'Satya Nadella',  desc: 'Microsoft CEO',            color: '#00a4ef', initial: 'SN' },
+      { name: 'Jeff Bezos',     desc: 'Amazon 创始人',            color: '#ff9900', initial: 'JB' },
+      { name: '梁文锋',         desc: 'DeepSeek 创始人',          color: '#4d6bfe', initial: '梁' },
+      { name: '李开复',         desc: '创新工场 · 前 Google 中国', color: '#ea4335', initial: '李' },
+    ];
+
+    // ---------- 弹簧工具 ----------
+    function springEasing(stiffness, damping) {
+      const w0 = Math.sqrt(stiffness);
+      const zeta = damping / (2 * w0);
+      const at = (t) => {
+        if (zeta >= 1) return 1 - (1 + w0 * t) * Math.exp(-w0 * t);
+        const wd = w0 * Math.sqrt(1 - zeta * zeta);
+        return 1 - Math.exp(-zeta * w0 * t) * (Math.cos(wd * t) + (zeta * w0 / wd) * Math.sin(wd * t));
+      };
+      let end = 0.05;
+      while (end < 2 && Math.abs(1 - at(end)) > 0.001) end += 0.01;
+      const points = Array.from({ length: 25 }, (_, i) =>
+        (i === 24 ? 1 : at(end * i / 24)).toFixed(4)
+      );
+      return {
+        duration: Math.round(end * 1000),
+        easing: `linear(${points.join(',')})`,
+      };
+    }
+
+    const SPRING_MENU = springEasing(320, 22);
+    document.documentElement.style.setProperty('--spring-duration', SPRING_MENU.duration + 'ms');
+    document.documentElement.style.setProperty('--spring-easing', SPRING_MENU.easing);
+
+    // ---------- 渲染列表 ----------
+    const menuList = document.getElementById('menuList');
+    const thumb = document.getElementById('thumb');
+
+    people.forEach((p, i) => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <button class="menu-item" data-index="${i}" data-value="${p.name}">
+          <span class="avatar" style="background:${p.color}">${p.initial}</span>
+          <span class="item-text">
+            <span class="item-name">${p.name}</span>
+            <span class="item-desc">${p.desc}</span>
+          </span>
+        </button>
+      `;
+      menuList.appendChild(li);
+    });
+
+    const items = [...menuList.querySelectorAll('.menu-item')];
+
+    // ---------- 状态 ----------
+    const trigger = document.getElementById('trigger');
+    const triggerValue = document.getElementById('triggerValue');
+    const menu = document.getElementById('menu');
+
+    let open = false;
+    let activeIndex = -1;
+    let thumbY = 0, thumbH = 48;
+    let targetY = 0, targetH = 48;
+    let velY = 0, velH = 0;
+    let raf = null, lastTime = 0;
+
+    function openMenu() {
+      if (open) return;
+      open = true;
+      menu.removeAttribute('data-leaving');
+      menu.setAttribute('data-open', '');
+      trigger.setAttribute('data-open', '');
+      setActive(0, true);
+    }
+
+    function closeMenu() {
+      if (!open) return;
+      open = false;
+      menu.removeAttribute('data-open');
+      menu.setAttribute('data-leaving', '');
+      trigger.removeAttribute('data-open');
+      activeIndex = -1;
+      thumb.removeAttribute('data-visible');
+      setTimeout(() => menu.removeAttribute('data-leaving'), 160);
+    }
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      open ? closeMenu() : openMenu();
+    });
+
+    document.addEventListener('mousedown', (e) => {
+      if (!menu.contains(e.target) && !trigger.contains(e.target)) closeMenu();
+    });
+
+    // ---------- 高亮跟随 ----------
+    function setActive(index, instant = false) {
+      if (index < 0 || index >= items.length) return;
+      activeIndex = index;
+      items.forEach((el, i) => el.toggleAttribute('data-active', i === index));
+
+      const el = items[index];
+      const listRect = menuList.getBoundingClientRect();
+      const itemRect = el.getBoundingClientRect();
+
+      targetY = itemRect.top - listRect.top + menuList.scrollTop;
+      targetH = itemRect.height;
+
+      if (instant) {
+        thumbY = targetY;
+        thumbH = targetH;
+        velY = velH = 0;
+        applyThumb();
+        thumb.setAttribute('data-visible', '');
+        return;
+      }
+
+      thumb.setAttribute('data-visible', '');
+      if (!raf) {
+        lastTime = performance.now();
+        raf = requestAnimationFrame(tick);
+      }
+    }
+
+    function springStep(pos, vel, target, stiffness, damping, dt) {
+      const force = -stiffness * (pos - target) - damping * vel;
+      const newVel = vel + force * dt;
+      const newPos = pos + newVel * dt;
+      return [newPos, newVel];
+    }
+
+    function tick(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.032);
+      lastTime = now;
+
+      [thumbY, velY] = springStep(thumbY, velY, targetY, 900, 51, dt);
+      [thumbH, velH] = springStep(thumbH, velH, targetH, 400, 34, dt);
+      applyThumb();
+
+      const dist = Math.abs(thumbY - targetY) + Math.abs(thumbH - targetH);
+      const speed = Math.abs(velY) + Math.abs(velH);
+
+      if (dist > 0.3 || speed > 5) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        thumbY = targetY;
+        thumbH = targetH;
+        velY = velH = 0;
+        applyThumb();
+        raf = null;
+      }
+    }
+
+    function applyThumb() {
+      thumb.style.transform = `translateY(${thumbY}px)`;
+      thumb.style.height = `${thumbH}px`;
+    }
+
+    items.forEach((el, i) => {
+      el.addEventListener('pointerenter', () => setActive(i));
+      el.addEventListener('click', () => {
+        triggerValue.textContent = el.dataset.value;
+        triggerValue.classList.add('has-value');
+        closeMenu();
+      });
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!open) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActive(Math.min(activeIndex + 1, items.length - 1));
+        items[activeIndex]?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActive(Math.max(activeIndex - 1, 0));
+        items[activeIndex]?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter' && activeIndex >= 0) {
+        e.preventDefault();
+        items[activeIndex].click();
+      } else if (e.key === 'Escape') {
+        closeMenu();
+      }
+    });
+
+    applyThumb();
+  </script>
+</body>
+</html>
