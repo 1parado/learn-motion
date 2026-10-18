@@ -115,6 +115,43 @@
       80%, 100% { top: 78px; }
     }
 
+    /* 迷你预览：3D 轮盘环 */
+    .mini-carousel {
+      perspective: 600px;
+      width: 200px;
+      height: 110px;
+      position: relative;
+      transform-style: preserve-3d;
+    }
+    .mini-ring {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform-style: preserve-3d;
+      animation: ring-spin 5s linear infinite;
+    }
+    .mini-chip {
+      position: absolute;
+      width: 54px;
+      height: 64px;
+      margin: -32px 0 0 -27px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 3px 10px rgba(0,0,0,.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink-2);
+      backface-visibility: hidden;
+    }
+    @keyframes ring-spin {
+      from { transform: rotateY(0deg); }
+      to { transform: rotateY(-360deg); }
+    }
+
     .card-body {
       padding: 16px 18px 18px;
     }
@@ -174,6 +211,7 @@
     @media (prefers-reduced-motion: reduce) {
       .card { transition: none; }
       .mini-thumb { animation: none; top: 42px; }
+      .mini-ring { animation: none; transform: rotateY(-24deg); }
     }
   </style>
 </head>
@@ -186,6 +224,19 @@
 
     <div class="grid">
       <!-- 已上线 -->
+      <a class="card" href="demos/AI轮盘.html">
+        <div class="card-preview">
+          <div class="mini-carousel">
+            <div class="mini-ring" id="miniRing"></div>
+          </div>
+        </div>
+        <div class="card-body">
+          <span class="card-tag">3D · 随机轮转</span>
+          <div class="card-title">AI 轮盘</div>
+          <div class="card-desc">卡片排成 3D 圆环，随机轮转挑一个 AI；拖拽带惯性，弹簧吸附停位。</div>
+        </div>
+      </a>
+
       <a class="card" href="demos/果冻下拉菜单.html">
         <div class="card-preview">
           <div class="mini-menu">
@@ -220,5 +271,24 @@
       <a href="https://github.com/1parado/learn-motion" target="_blank" rel="noopener">GitHub</a>
     </footer>
   </div>
+  <script>
+    // 迷你 3D 轮盘预览：8 张色卡排成圆环持续旋转
+    (function () {
+      var ringEl = document.getElementById('miniRing');
+      if (!ringEl) return;
+      var colors = ['#4d6bfe', '#10a37f', '#d97757', '#4285f4', '#20808d', '#ff7000', '#615ced', '#141414'];
+      var n = colors.length, per = 360 / n, r = 110;
+      colors.forEach(function (c, i) {
+        var chip = document.createElement('div');
+        chip.className = 'mini-chip';
+        chip.textContent = String(i + 1);
+        chip.style.background = '#fff';
+        chip.style.borderTop = '3px solid ' + c;
+        chip.style.transform = 'rotateY(' + per * i + 'deg) translateZ(' + r + 'px)';
+        ringEl.appendChild(chip);
+      });
+      ringEl.style.transform = 'rotateY(-18deg)';
+    })();
+  </script>
 </body>
 </html>

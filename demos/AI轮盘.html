@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 轮盘 · 3D 环形随机轮转</title>
+  <style>
+    :root {
+      --ink: #141414;
+      --ink-2: rgba(20,20,20,.6);
+      --ink-3: rgba(20,20,20,.36);
+      --hover: rgba(119,119,119,.09);
+      --card: #ffffff;
+      --line: rgba(20,20,20,.08);
+      --accent: #4d6bfe;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: #f0f0f0;
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      padding: 40px 20px;
+      overflow: hidden;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--ink-2);
+      letter-spacing: -0.02em;
+    }
+
+    /* ---------- 3D 舞台 ---------- */
+    .stage {
+      position: relative;
+      width: min(640px, 92vw);
+      height: 300px;
+      perspective: 1200px;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: pan-y;
+    }
+    .stage:active { cursor: grabbing; }
+
+    .ring {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform-style: preserve-3d;
+      /* 旋转由 rAF 写 transform（缓动/惯性/弹簧），不走 CSS transition */
+    }
+
+    .ai-card {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 96px;
+      height: 112px;
+      margin: -56px 0 0 -48px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--card);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      backface-visibility: hidden;
+      box-shadow: 0 6px 20px rgba(0,0,0,.08);
+      transition: box-shadow .2s ease;
+      will-change: transform, opacity;
+    }
+    .ai-card:hover {
+      box-shadow: 0 10px 28px rgba(77,107,254,.18);
+    }
+    .ai-card.win {
+      border-color: rgba(77,107,254,.55);
+      box-shadow:
+        0 0 0 3px rgba(77,107,254,.18),
+        0 10px 30px rgba(77,107,254,.28);
+    }
+    .ai-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 19px;
+      font-weight: 600;
+      user-select: none;
+    }
+    .ai-name {
+      font-size: 12px;
+      color: var(--ink-2);
+      max-width: 84px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* 指针：环顶部小三角，指到谁就是谁 */
+    .pointer {
+      position: absolute;
+      left: 50%;
+      top: -6px;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 9px solid transparent;
+      border-right: 9px solid transparent;
+      border-top: 13px solid var(--accent);
+      filter: drop-shadow(0 2px 4px rgba(77,107,254,.35));
+      z-index: 2;
+    }
+
+    /* ---------- 操作区 ---------- */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .spin-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 12px 36px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      font-family: inherit;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), #7b92ff);
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(77,107,254,.35);
+      transition: box-shadow .15s ease, transform .15s ease, filter .15s ease;
+    }
+    .spin-btn:hover {
+      filter: brightness(1.06);
+      transform: translateY(-1px);
+      box-shadow: 0 8px 22px rgba(77,107,254,.45);
+    }
+    .spin-btn:active {
+      transform: scale(.96);
+      box-shadow: 0 2px 8px rgba(77,107,254,.3);
+    }
+    .spin-btn:disabled {
+      opacity: .6;
+      cursor: default;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .result {
+      min-height: 24px;
+      font-size: 14px;
+      color: var(--ink-3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .result .hit {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--ink);
+      text-decoration: none;
+      animation: pop-in .3s cubic-bezier(.34,1.56,.64,1);
+    }
+    .result .hit:hover { color: var(--accent); }
+    .result .hit .dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    @keyframes pop-in {
+      from { transform: scale(.6); opacity: 0; }
+    }
+
+    .note {
+      max-width: 560px;
+      font-size: 12.5px;
+      line-height: 1.8;
+      color: var(--ink-3);
+      background: rgba(255,255,255,.6);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+    }
+    .note strong { color: var(--ink-2); }
+    .note kbd {
+      font-family: inherit;
+      font-size: 11px;
+      color: var(--ink-2);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 0 5px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .spin-btn, .ai-card, .result .hit { transition: none; animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <h1>AI 轮盘 · 3D 环形随机轮转</h1>
+
+  <div class="stage" id="stage">
+    <div class="pointer"></div>
+    <div class="ring" id="ring"></div>
+  </div>
+
+  <div class="controls">
+    <button class="spin-btn" id="spinBtn" type="button">开始轮转</button>
+  </div>
+  <div class="result" id="result" aria-live="polite">点击「开始轮转」随机挑一个 AI 打开；拖动圆环浏览，或直接点卡片。</div>
+
+  <div class="note">
+    <strong>实现要点</strong><br>
+    1. 卡片沿 Y 轴 <code>rotateY + translateZ</code> 排成圆环，纯 CSS 3D、零依赖<br>
+    2. 轮转用 ease-in-out 长缓动（3~5 圈），停位对齐指针；也可拖拽 + 惯性 + 弹簧吸附<br>
+    3. 深度衰减：背面卡片按角度缩小、降透明，模拟圆筒纵深感<br>
+    4. 命中后高亮并打开对应官网；键盘 <kbd>Space</kbd> 轮转、<kbd>←</kbd><kbd>→</kbd> 微调
+  </div>
+
+  <script>
+    // ---------- AI 站点数据（与 deepseek-sider 内置清单同源） ----------
+    const sites = [
+      { name: 'DeepSeek',   url: 'https://chat.deepseek.com/',   color: '#4d6bfe', initial: 'DS' },
+      { name: 'ChatGPT',    url: 'https://chatgpt.com/',         color: '#10a37f', initial: 'GP' },
+      { name: 'Claude',     url: 'https://claude.ai/',           color: '#d97757', initial: 'CL' },
+      { name: 'Gemini',     url: 'https://gemini.google.com/',   color: '#4285f4', initial: 'GE' },
+      { name: 'Grok',       url: 'https://grok.com/',            color: '#141414', initial: 'GR' },
+      { name: '豆包',        url: 'https://www.doubao.com/',      color: '#0f6cff', initial: '豆' },
+      { name: 'Kimi',       url: 'https://www.kimi.com/',        color: '#111318', initial: 'KI' },
+      { name: '智谱清言',    url: 'https://chatglm.cn/',          color: '#3859ff', initial: '智' },
+      { name: '通义千问',    url: 'https://tongyi.aliyun.com/',   color: '#615ced', initial: '通' },
+      { name: '腾讯元宝',    url: 'https://yuanbao.tencent.com/', color: '#0052d9', initial: '元' },
+      { name: 'Perplexity', url: 'https://www.perplexity.ai/',   color: '#20808d', initial: 'PX' },
+      { name: 'Le Chat',    url: 'https://chat.mistral.ai/',     color: '#ff7000', initial: 'MC' },
+    ];
+
+    // ---------- 渲染圆环 ----------
+    const ring = document.getElementById('ring');
+    const stage = document.getElementById('stage');
+    const spinBtn = document.getElementById('spinBtn');
+    const result = document.getElementById('result');
+    const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const N = sites.length;
+    const PER = 360 / N;
+    const state = {
+      angle: 0, raf: 0, mode: 'idle', // idle | spin | drag | inertia | settle
+      v: 0, R: 300, target: 0,
+      spinFrom: 0, spinDelta: 0, spinT0: 0, spinDur: 0,
+      dragX: 0, dragA0: 0, dragMoved: false, samples: [], lastT: 0,
+      openTimer: 0, silent: false,
+    };
+    const cards = [];
+
+    sites.forEach((s, i) => {
+      const b = document.createElement('button');
+      b.className = 'ai-card';
+      b.type = 'button';
+      b.title = s.name;
+      b.innerHTML = `<span class="ai-avatar" style="background:${s.color}">${s.initial}</span><span class="ai-name">${s.name}</span>`;
+      b.addEventListener('click', () => {
+        // 拖拽后（dragMoved）或旋转中不当作选择；纯点击允许打断 settle 惯性
+        if (state.dragMoved || state.mode === 'spin' || state.mode === 'drag') return;
+        spinTo(i, 1, 1300);
+      });
+      ring.appendChild(b);
+      cards.push(b);
+    });
+
+    function radius() {
+      // 略宽于舞台（两侧裁出圆筒感），且保证相邻卡片不重叠
+      return Math.max(230, Math.min(stage.clientWidth, 640) * 0.5, (N * 52) / Math.PI);
+    }
+
+    function layout() {
+      state.R = radius();
+      for (let i = 0; i < N; i++) {
+        const total = PER * i + state.angle;
+        const depth = (1 - Math.cos(total * Math.PI / 180)) / 2; // 0=正前 1=正后
+        const el = cards[i];
+        el.style.transform = `rotateY(${total}deg) translateZ(${state.R}px) scale(${1 - depth * 0.24})`;
+        el.style.opacity = String(1 - depth * 0.8);
+      }
+    }
+
+    // ---------- 轮转 ----------
+    // 帧驱动：前台走 rAF；后台标签 rAF 被浏览器暂停时用 setTimeout 兜底，
+    // 避免轮转「冻结」在半路（真实前台用户全程走 rAF，无差别）
+    const HAS_RAF = typeof requestAnimationFrame === 'function';
+    let rafFired = false;
+    requestAnimationFrame(() => { rafFired = true; });
+    function pump() {
+      if (HAS_RAF && rafFired) requestAnimationFrame(frame);
+      else setTimeout(() => frame(performance.now()), 16);
+    }
+    const easeInOutQuart = (t) => (t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2);
+
+    function spinTo(targetIdx, turns, dur) {
+      if (state.mode === 'spin' || state.mode === 'drag') return;
+      cards.forEach((c) => c.classList.remove('win'));
+      const cur = ((state.angle % 360) + 360) % 360;
+      const dest = -targetIdx * PER;
+      const delta = (((dest - cur) % 360) + 360) % 360;
+      state.spinFrom = state.angle;
+      state.spinDelta = delta + turns * 360;
+      state.spinDur = REDUCED ? 300 : dur;
+      state.spinT0 = performance.now();
+      state.mode = 'spin';
+      state.lastT = 0;
+      spinBtn.disabled = true;
+      result.textContent = '轮转中…';
+      if (state.raf) cancelAnimationFrame(state.raf);
+      pump();
+    }
+
+    function finish(silent) {
+      state.mode = 'idle';
+      state.raf = 0;
+      state.angle = ((state.angle % 360) + 360) % 360;
+      const idx = ((Math.round(-state.angle / PER) % N) + N) % N;
+      const s = sites[idx];
+      if (silent) {
+        // 拖拽/惯性后的吸附落位：只提示指针位置
+        result.textContent = `指针停在「${s.name}」——点「开始轮转」重转，或直接点卡片。`;
+        return;
+      }
+      cards[idx].classList.add('win');
+      spinBtn.disabled = false;
+      result.innerHTML = '';
+      const a = document.createElement('a');
+      a.className = 'hit';
+      a.href = s.url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.innerHTML = `<span class="dot" style="background:${s.color}">${s.initial}</span>${s.name} ↗`;
+      result.appendChild(a);
+      clearTimeout(state.openTimer);
+      state.openTimer = setTimeout(() => window.open(s.url, '_blank', 'noopener'), 700);
+    }
+
+    function frame(t) {
+      if (!state.lastT) state.lastT = t;
+      const dt = Math.min(0.05, (t - state.lastT) / 1000);
+      state.lastT = t;
+      if (state.mode === 'spin') {
+        const k = Math.min(1, (t - state.spinT0) / state.spinDur);
+        state.angle = state.spinFrom + state.spinDelta * easeInOutQuart(k);
+        if (k >= 1) { layout(); state.lastT = 0; finish(); return; }
+      } else if (state.mode === 'inertia') {
+        state.angle += state.v * dt;
+        state.v *= Math.exp(-2.2 * dt); // 指数摩擦
+        if (Math.abs(state.v) < 60) {
+          state.mode = 'settle';
+          state.target = Math.round(state.angle / PER) * PER;
+        }
+      } else if (state.mode === 'settle') {
+        // 欠阻尼弹簧吸附：轻微过冲后落位
+        state.v = (state.v + (state.target - state.angle) * 0.17) * 0.76;
+        state.angle += state.v;
+        if (Math.abs(state.target - state.angle) < 0.25 && Math.abs(state.v) < 0.25) {
+          state.angle = state.target;
+          layout();
+          state.lastT = 0;
+          finish(state.silent);
+          return;
+        }
+      } else {
+        state.raf = 0;
+        return;
+      }
+      layout();
+      pump();
+    }
+
+    // ---------- 拖拽：跟手旋转，松手按最近 120ms 速度进惯性 ----------
+    stage.addEventListener('pointerdown', (e) => {
+      if (state.mode === 'spin') return;
+      if (state.raf) cancelAnimationFrame(state.raf);
+      state.raf = 0;
+      state.dragX = e.clientX;
+      state.dragA0 = state.angle;
+      state.dragMoved = false;
+      state.samples = [[performance.now(), e.clientX]];
+      state.mode = 'drag';
+      stage.setPointerCapture(e.pointerId);
+      // 不 preventDefault：避免连带抑制卡片 click；防误选交给 user-select:none
+    });
+    stage.addEventListener('pointermove', (e) => {
+      if (state.mode !== 'drag') return;
+      const dx = e.clientX - state.dragX;
+      if (Math.abs(dx) > 6) state.dragMoved = true;
+      state.angle = state.dragA0 + dx * 0.45;
+      const now = performance.now();
+      state.samples.push([now, e.clientX]);
+      while (state.samples.length > 2 && now - state.samples[0][0] > 120) state.samples.shift();
+      layout();
+    });
+    function dragEnd() {
+      if (state.mode !== 'drag') return;
+      state.silent = true; // 拖拽后的吸附只落位，不触发打开
+      const now = performance.now();
+      const samples = state.samples.filter((s) => now - s[0] <= 120);
+      let v = 0;
+      if (samples.length >= 2) {
+        const [t0, x0] = samples[0];
+        const [t1, x1] = samples[samples.length - 1];
+        if (t1 > t0) v = (((x1 - x0) * 0.45) / (t1 - t0)) * 1000; // deg/s
+      }
+      state.v = Math.max(-700, Math.min(700, v));
+      if (Math.abs(state.v) > 60) state.mode = 'inertia';
+      else {
+        state.mode = 'settle';
+        state.target = Math.round(state.angle / PER) * PER;
+      }
+      state.lastT = 0;
+      pump();
+    }
+    stage.addEventListener('pointerup', dragEnd);
+    stage.addEventListener('pointercancel', dragEnd);
+
+    // ---------- 键盘 ----------
+    document.addEventListener('keydown', (e) => {
+      if (e.key === ' ' && state.mode !== 'spin') {
+        e.preventDefault();
+        spinTo(Math.floor(Math.random() * N), 3 + Math.floor(Math.random() * 3), 3400 + Math.random() * 900);
+      } else if (e.key === 'ArrowLeft' && state.mode !== 'spin' && state.mode !== 'drag') {
+        state.silent = true;
+        state.mode = 'settle';
+        state.target = Math.round((state.angle + PER) / PER) * PER;
+        state.lastT = 0;
+        pump();
+      } else if (e.key === 'ArrowRight' && state.mode !== 'spin' && state.mode !== 'drag') {
+        state.silent = true;
+        state.mode = 'settle';
+        state.target = Math.round((state.angle - PER) / PER) * PER;
+        state.lastT = 0;
+        pump();
+      }
+    });
+
+    spinBtn.addEventListener('click', () => {
+      spinTo(Math.floor(Math.random() * N), 3 + Math.floor(Math.random() * 3), 3400 + Math.random() * 900);
+    });
+
+    layout();
+  </script>
+</body>
+</html>

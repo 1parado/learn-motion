@@ -11,6 +11,7 @@
 | 名称 | 说明 | 入口 |
 |------|------|------|
 | 果冻下拉菜单 | 阻尼弹簧 + 前后缘双弹簧高亮跟随 | [demos/果冻下拉菜单.html](demos/果冻下拉菜单.html) |
+| AI 轮盘 | 3D 环形随机轮转 · 拖拽惯性 + 弹簧吸附 | [demos/AI轮盘.html](demos/AI轮盘.html) |
 
 ## 本地打开
 
@@ -28,7 +29,8 @@ npx serve .
 learn-motion/
 ├── index.html              # 聚合首页（卡片列表）
 ├── demos/
-│   └── 果冻下拉菜单.html    # 单个动效 demo
+│   ├── 果冻下拉菜单.html    # 单个动效 demo
+│   └── AI轮盘.html          # 3D 环形随机轮转 demo
 └── README.md
 ```
 
@@ -43,3 +45,4 @@ learn-motion/
 - 无构建、无依赖，单文件 HTML 即可运行  
 - 弹簧曲线参考 DS Bot 的 `motion.js`：二阶阻尼弹簧采样为 CSS `linear()`  
 - 高亮条用「前缘硬弹簧 + 后缘软弹簧」制造果冻拉伸感  
+- 3D 轮盘：`rotateY + translateZ` 排环 + 深度衰减，缓动轮转 / 拖拽惯性 / 弹簧吸附三套运动状态机
